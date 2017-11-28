@@ -44,7 +44,7 @@ num_channels = 3
 
 print "[i] Leyendo archivo de entrada"
 
-image = cv2.imread(img_path)
+image = cv2.imread(FLAGS.target)
 image = cv2.resize(image, (img_size, img_size),0,0, cv2.INTER_LINEAR)
 
 print "[i] Preparando entrada para el modelo"
