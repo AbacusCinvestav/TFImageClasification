@@ -44,8 +44,14 @@ num_channels = 3
 
 print "[i] Leyendo archivo de entrada"
 
-image = cv2.imread(FLAGS.target)
-image = cv2.resize(image, (img_size, img_size),0,0, cv2.INTER_LINEAR)
+try:
+	image = cv2.imread(FLAGS.target)
+	image = cv2.resize(image, (img_size, img_size),0,0, cv2.INTER_LINEAR)
+
+except:
+	print "[!!] Al target no existe"
+	exit()
+
 
 print "[i] Preparando entrada para el modelo"
 
@@ -86,6 +92,10 @@ print ""
 
 for i in range(num_classes):
 	print "[>] %s: %s%%" %(classes[i], int(result[i] * 100))
+
+cv2.imshow('image',image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
 print ""
 print "[i] ..."
