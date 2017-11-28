@@ -49,7 +49,7 @@ try:
 	image = cv2.resize(image, (img_size, img_size),0,0, cv2.INTER_LINEAR)
 
 except:
-	print "[!!] Al target no existe"
+	print "[!!] El target no existe, verifica tu ruta"
 	exit()
 
 
