@@ -3,7 +3,7 @@ import numpy as np
 import os,glob,cv2
 import sys,argparse
 
-
+# Lectura y validacion de los parametros de la linea de comandos
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
@@ -53,6 +53,7 @@ num_channels = 3
 
 print "[i] Leyendo archivo de entrada"
 
+# Lectura de la entrada (imagen)
 try:
 	image = cv2.imread(FLAGS.target)
 	image = cv2.resize(image, (img_size, img_size),0,0, cv2.INTER_LINEAR)
@@ -64,6 +65,7 @@ except:
 
 print "[i] Preparando entrada para el modelo"
 
+# Preparacion de la enterada (resize)
 net_input = []
 net_input.append(image)
 
@@ -76,7 +78,10 @@ print "[i] Cargando modelo"
 print ""
 print ""
 
+# Inicializacion del entorno de tensorflow
 sess = tf.Session()
+
+# Lectura del modelo almacenado
 saver = tf.train.import_meta_graph("%s/%s-model.meta" %(FLAGS.model, FLAGS.model))
 saver.restore(sess, tf.train.latest_checkpoint("%s/" %(FLAGS.model)))
 
@@ -86,6 +91,7 @@ print ""
 print "[i] Modelo cargado"
 print "[i] Preparando el modelo"
 
+# Le decimos a tensorflow que use el modelo que entrenamos previamente para la inferencia
 graph = tf.get_default_graph()
 y_pred = graph.get_tensor_by_name("y_pred:0")
 x= graph.get_tensor_by_name("x:0") 
@@ -94,6 +100,7 @@ y_test_images = np.zeros((1, num_classes))
 
 print "[i] Solicitando inferencia"
 
+# Ingresamos la entrada a tensor y leemos la respuesta de la red
 feed_dict_testing = {x: x_batch, y_true: y_test_images}
 result=sess.run(y_pred, feed_dict=feed_dict_testing)[0]
 
