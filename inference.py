@@ -19,6 +19,15 @@ if not FLAGS.model:
 if not FLAGS.target:
 	print "[!!] Falta archivo de entrada"
 	exit()
+	
+if sys.argv[1] == "--help":
+    print "TensorFlow Image Clasification Utility"
+    print ""
+    print "Uso:"
+    print ""
+    print "    python inference.py --model=<NOMBRE_DEL_MODELO> --target=<ENTRADA>"
+    print ""
+    exit()
 
 print "[i] Modelo de inferencia: %s" %(FLAGS.model)
 print "[i] Archivo de entrada: %s" %(FLAGS.target)
