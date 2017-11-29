@@ -29,4 +29,10 @@ Crea alias para poder utilizar los scripts en la carpeta de datasets
 - alias TF_train="python /home/$USER/TFImageClasification/train.py"
 - alias TF_inference="python /home/$USER/TFImageClasification/inference.py"
 
-### Preparación de los datasets
+### Entrenamiento
+
+TF_train --model=<MODELO>
+  
+### Prueba de inferencia
+
+TF_inference --model=<MODELO> --target=<PATH/DEL/TARGET>
