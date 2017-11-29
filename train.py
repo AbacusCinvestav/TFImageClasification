@@ -8,6 +8,8 @@ import random
 import numpy as np
 import sys
 
+# Inicia los generadores pseudo aleatorios con semillas distintas
+# Para que numpy y tensorflow no generen los mismos numeros pseudo-aleatorios
 from numpy.random import seed
 seed(1)
 from tensorflow import set_random_seed
@@ -30,6 +32,7 @@ if sys.argv[1] == "--help":
     print "                                      default: 300"
     exit()
 
+# Lectura de argumentos de la linea de comandos
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
@@ -40,6 +43,7 @@ flags.DEFINE_string("model", None, "Nombre del modelo a entrenar")
 
 FLAGS(sys.argv)
 
+# Validacion de argumentos
 if not FLAGS.model:
 	print "[!!] Indique un nombre para el modelo"
 
@@ -67,6 +71,7 @@ if num_classes == 0:
 
 print "[i] Leyendo imagenes del dataset, puede tomar varios segundos" 
 
+# Lectura y preparacion de el set de datos
 data = dataset.read_train_sets(dataset_train, img_size, classes, validation_size=(FLAGS.validation_size/100.0))
 
 print "[i] Lectura del dataset completada"
@@ -84,16 +89,17 @@ raw_input("[i] Presione cualquier tecla para comenzar el entrenamiento...")
 print ""
 print ""
 
+# Inicializacion del entorno de tensorflow
 session = tf.Session()
+
+# Inicializacion y definicion del tensor de entrada
 x = tf.placeholder(tf.float32, shape=[None, img_size,img_size,num_channels], name='x')
 
-## labels
+# inicializacion y definicion del tensor de salida
 y_true = tf.placeholder(tf.float32, shape=[None, num_classes], name='y_true')
 y_true_cls = tf.argmax(y_true, dimension=1)
 
-
-
-##Network graph params
+# Definicion de la arquitectura de la red
 filter_size_conv1 = 3 
 num_filters_conv1 = 32
 
@@ -105,44 +111,39 @@ num_filters_conv3 = 64
     
 fc_layer_size = 128
 
+# Funciones para la inicializacion de los hiperparametros de la red
 def create_weights(shape):
     return tf.Variable(tf.truncated_normal(shape, stddev=0.05))
 
 def create_biases(size):
     return tf.Variable(tf.constant(0.05, shape=[size]))
 
-
-
+# Funcion para la inicializacion de las capas de convolucion
 def create_convolutional_layer(input,
                num_input_channels, 
                conv_filter_size,        
                num_filters):  
-    
-    ## We shall define the weights that will be trained using create_weights function.
+
     weights = create_weights(shape=[conv_filter_size, conv_filter_size, num_input_channels, num_filters])
-    ## We create biases using the create_biases function. These are also trained.
     biases = create_biases(num_filters)
 
-    ## Creating the convolutional layer
     layer = tf.nn.conv2d(input=input,
                      filter=weights,
                      strides=[1, 1, 1, 1],
                      padding='SAME')
 
     layer += biases
-
-    ## We shall be using max-pooling.  
+	
     layer = tf.nn.max_pool(value=layer,
                             ksize=[1, 2, 2, 1],
                             strides=[1, 2, 2, 1],
                             padding='SAME')
-    ## Output of pooling is fed to Relu which is the activation function for us.
+
     layer = tf.nn.relu(layer)
 
     return layer
 
-    
-
+# Funcion para inicializar las capas de reducción
 def create_flatten_layer(layer):
     #We know that the shape of the layer will be [batch_size img_size img_size num_channels] 
     # But let's get it from the previous layer.
@@ -156,24 +157,23 @@ def create_flatten_layer(layer):
 
     return layer
 
-
+# Funcion para inicializar las capas de clasificacion
 def create_fc_layer(input,          
              num_inputs,    
              num_outputs,
              use_relu=True):
     
-    #Let's define trainable weights and biases.
     weights = create_weights(shape=[num_inputs, num_outputs])
     biases = create_biases(num_outputs)
 
-    # Fully connected layer takes input x and produces wx+b.Since, these are matrices, we use matmul function in Tensorflow
+    # (x * w) + b
     layer = tf.matmul(input, weights) + biases
     if use_relu:
         layer = tf.nn.relu(layer)
 
     return layer
 
-
+# Se crean 3 capas de convolucion
 layer_conv1 = create_convolutional_layer(input=x,
                num_input_channels=num_channels,
                conv_filter_size=filter_size_conv1,
@@ -187,9 +187,11 @@ layer_conv3= create_convolutional_layer(input=layer_conv2,
                num_input_channels=num_filters_conv2,
                conv_filter_size=filter_size_conv3,
                num_filters=num_filters_conv3)
-          
+
+# Una capa de reduccion
 layer_flat = create_flatten_layer(layer_conv3)
 
+# 2 capas para la prediccion
 layer_fc1 = create_fc_layer(input=layer_flat,
                      num_inputs=layer_flat.get_shape()[1:4].num_elements(),
                      num_outputs=fc_layer_size,
@@ -200,21 +202,22 @@ layer_fc2 = create_fc_layer(input=layer_fc1,
                      num_outputs=num_classes,
                      use_relu=False) 
 
+# Funcion de costo
 y_pred = tf.nn.softmax(layer_fc2,name='y_pred')
-
 y_pred_cls = tf.argmax(y_pred, dimension=1)
 session.run(tf.global_variables_initializer())
 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=layer_fc2,
                                                     labels=y_true)
+
+# Optimizacion Adam (No usa optimizacion por gradiente desendiente)
 cost = tf.reduce_mean(cross_entropy)
 optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cost)
 correct_prediction = tf.equal(y_pred_cls, y_true_cls)
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-
 session.run(tf.global_variables_initializer()) 
 
-
+# Funcion que nos permite mostrar el progreso del entrenamiento
 def show_progress(epoch, iteration, feed_dict_train, feed_dict_validate, val_loss):
     acc = session.run(accuracy, feed_dict=feed_dict_train)
     val_acc = session.run(accuracy, feed_dict=feed_dict_validate)
@@ -227,6 +230,8 @@ print ""
 print ""
 print "[i] Iniciando entrenamiento"
 
+# El entrenamiento va a ejecutarse indefinidamente hasta que el modelo
+# alcance la precision deseada
 def train(accuracy_target):
     
     i = 0
@@ -236,7 +241,6 @@ def train(accuracy_target):
         x_batch, y_true_batch, _, cls_batch = data.train.next_batch(batch_size)
         x_valid_batch, y_valid_batch, _, valid_cls_batch = data.valid.next_batch(batch_size)
 
-        
         feed_dict_tr = {x: x_batch,
                            y_true: y_true_batch}
         feed_dict_val = {x: x_valid_batch,
@@ -250,10 +254,13 @@ def train(accuracy_target):
 
         show_progress(epoch, (i + 1) * batch_size, feed_dict_tr, feed_dict_val, val_loss)
 
+	# guarda el modelo y se detiene el entrenamiento cuando alcanza
+	# la precision deseada
         if int(val_acc) >= int(accuracy_target):
         	saver.save(session, '%s/%s-model' %(FLAGS.model, FLAGS.model)) 
         	break
 
+	# Tambien guarda el modelo y muestra el progreso en cada epoca
         if i % int(data.train.num_examples/batch_size) == 0:
             saver.save(session, '%s/%s-model' %(FLAGS.model, FLAGS.model))
 
