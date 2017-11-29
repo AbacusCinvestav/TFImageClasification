@@ -31,8 +31,8 @@ Crea alias para poder utilizar los scripts en la carpeta de datasets
 
 ### Entrenamiento
 
-TF_train --model=<MODELO>
+TF_train --model=<NOMBRE_DEL_MODELO>
   
 ### Prueba de inferencia
 
-TF_inference --model=<MODELO> --target=<PATH/DEL/TARGET>
+TF_inference --model=<NOMBRE_DEL_MODELO> --target=<PATH/DEL/TARGET>
