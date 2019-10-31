@@ -1,0 +1,105 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>%MODEL% training</title>
+<script>
+window.onload = function () {
+
+var dps1 = []; // dataPoints
+var dps2 = [];
+
+function toogleDataSeries(e){
+	if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+		e.dataSeries.visible = false;
+	} else{
+		e.dataSeries.visible = true;
+	}
+	chart.render();
+}
+
+var chart = new CanvasJS.Chart("chartContainer", {
+	title :{
+		text: "%MODEL% training"
+	},
+  axisX: {
+    title: "ite"
+  },
+	axisY: {
+		includeZero: false,
+    title: "error"
+	},
+	toolTip: {
+		shared: true
+	},
+	legend: {
+		cursor: "pointer",
+		verticalAlign: "top",
+		horizontalAlign: "center",
+		dockInsidePlotArea: true,
+		itemclick: toogleDataSeries
+	},
+	data: [{
+    type: "splineArea",
+    dataPoints: dps2,
+    axisYType: "secondary",
+    showInLegend: true,
+    markerSize: 0,
+    name: "validation"
+  },{
+		type: "splineArea",
+		dataPoints: dps1,
+    showInLegend: true,
+    markerSize: 0,
+    name: "training"
+	}]
+});
+
+var updateInterval = 1000;
+
+var xhr = new XMLHttpRequest();
+
+function pull_histograms() {
+  xhr.open('GET', 'histograms.json');
+  xhr.onload = function() {
+      if (xhr.status === 200) {
+          obj = JSON.parse(xhr.responseText);
+
+          for (var i = dps2.length; i < obj.histograms.v_error.xs.length; i++) {
+
+            data = {
+                x: obj.histograms.v_error.xs[i],
+                y:  obj.histograms.v_error.ys[i]
+            };
+
+            dps2.push(data);
+          }
+
+          for (var i = dps1.length; i < obj.histograms.t_error.xs.length; i++) {
+
+            data = {
+                x: obj.histograms.t_error.xs[i],
+                y:  obj.histograms.t_error.ys[i]
+            };
+
+            dps1.push(data);
+          }
+
+          chart.render();
+      }
+      else {
+          console.log('Request failed.  Returned status of ' + xhr.status);
+      }
+  };
+  xhr.send();
+}
+
+setInterval(pull_histograms, 1000);
+
+}
+</script>
+</head>
+<body>
+<div id="chartContainer" style="height: 500px; width: 100%;"></div>
+<script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+</body>
+</html>

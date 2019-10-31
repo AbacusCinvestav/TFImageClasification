@@ -19,7 +19,7 @@ if not FLAGS.model:
 if not FLAGS.target:
 	print "[!!] Falta archivo de entrada"
 	exit()
-	
+
 if sys.argv[1] == "--help":
     print "TensorFlow Image Clasification Utility"
     print ""
@@ -78,12 +78,28 @@ print "[i] Cargando modelo"
 print ""
 print ""
 
-# Inicializacion del entorno de tensorflow
+#netwotk input
+x = tf.placeholder("float", [None, img_size, img_size, channels])
+
+#network output
+y = tf.placeholder("float", [None, num_classes])
+
+# input_size, num_classes (outputs), img_channels, input tensor, output tensor
+cnn = network.cnn_model(img_size, num_classes, 3, x, y)
+
+init =  tf.global_variables_initializer()
+
 sess = tf.Session()
 
-# Lectura del modelo almacenado
-saver = tf.train.import_meta_graph("%s/%s-model.meta" %(FLAGS.model, FLAGS.model))
-saver.restore(sess, tf.train.latest_checkpoint("%s/" %(FLAGS.model)))
+if not os.path.isfile("%s.meta" %(model_checkpoint)):
+
+	print "[i] Checkpoint cannot be loaded (it doesn't exists)"
+	sess.run(init)
+
+else:
+
+	loader = tf.train.import_meta_graph("%s.meta" %(model_checkpoint))
+	loader.restore(sess, tf.train.latest_checkpoint("%s/" %(FLAGS.model)))
 
 print ""
 print ""
@@ -92,17 +108,13 @@ print "[i] Modelo cargado"
 print "[i] Preparando el modelo"
 
 # Le decimos a tensorflow que use el modelo que entrenamos previamente para la inferencia
-graph = tf.get_default_graph()
-y_pred = graph.get_tensor_by_name("y_pred:0")
-x= graph.get_tensor_by_name("x:0") 
-y_true = graph.get_tensor_by_name("y_true:0") 
-y_test_images = np.zeros((1, num_classes)) 
+y_test_images = np.zeros((1, num_classes))
 
 print "[i] Solicitando inferencia"
 
 # Ingresamos la entrada a tensor y leemos la respuesta de la red
 feed_dict_testing = {x: x_batch, y_true: y_test_images}
-result=sess.run(y_pred, feed_dict=feed_dict_testing)[0]
+result=sess.run(cnn['pred'], feed_dict=feed_dict_testing)[0]
 
 print ""
 

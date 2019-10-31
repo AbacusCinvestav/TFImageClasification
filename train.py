@@ -36,8 +36,8 @@ if sys.argv[1] == "--help":
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer("batch", 300, "Tamanio del batch de entrenamiento")
-flags.DEFINE_integer("validation_size", 20, "Porcentaje de datos usados para la validacion")
+flags.DEFINE_integer("batch", 100, "Tamanio del batch de entrenamiento")
+flags.DEFINE_integer("validation_size", 10, "Porcentaje de datos usados para la validacion")
 flags.DEFINE_integer("accuracy_target", 90, "Precision que se busca para el modelo")
 flags.DEFINE_string("model", None, "Nombre del modelo a entrenar")
 
@@ -69,7 +69,7 @@ if num_classes == 0:
 	print "[!!] Directorio del dataset de entrenamiento vacio"
 	exit()
 
-print "[i] Leyendo imagenes del dataset, puede tomar varios segundos" 
+print "[i] Leyendo imagenes del dataset, puede tomar varios segundos"
 
 # Lectura y preparacion de el set de datos
 data = dataset.read_train_sets(dataset_train, img_size, classes, validation_size=(FLAGS.validation_size/100.0))
@@ -100,7 +100,7 @@ y_true = tf.placeholder(tf.float32, shape=[None, num_classes], name='y_true')
 y_true_cls = tf.argmax(y_true, dimension=1)
 
 # Definicion de la arquitectura de la red
-filter_size_conv1 = 3 
+filter_size_conv1 = 3
 num_filters_conv1 = 32
 
 filter_size_conv2 = 3
@@ -108,7 +108,7 @@ num_filters_conv2 = 32
 
 filter_size_conv3 = 3
 num_filters_conv3 = 64
-    
+
 fc_layer_size = 128
 
 # Funciones para la inicializacion de los hiperparametros de la red
@@ -120,9 +120,9 @@ def create_biases(size):
 
 # Funcion para la inicializacion de las capas de convolucion
 def create_convolutional_layer(input,
-               num_input_channels, 
-               conv_filter_size,        
-               num_filters):  
+               num_input_channels,
+               conv_filter_size,
+               num_filters):
 
     weights = create_weights(shape=[conv_filter_size, conv_filter_size, num_input_channels, num_filters])
     biases = create_biases(num_filters)
@@ -133,7 +133,7 @@ def create_convolutional_layer(input,
                      padding='SAME')
 
     layer += biases
-	
+
     layer = tf.nn.max_pool(value=layer,
                             ksize=[1, 2, 2, 1],
                             strides=[1, 2, 2, 1],
@@ -143,9 +143,9 @@ def create_convolutional_layer(input,
 
     return layer
 
-# Funcion para inicializar las capas de reducción
+# Funcion para inicializar las capas de reduccion
 def create_flatten_layer(layer):
-    #We know that the shape of the layer will be [batch_size img_size img_size num_channels] 
+    #We know that the shape of the layer will be [batch_size img_size img_size num_channels]
     # But let's get it from the previous layer.
     layer_shape = layer.get_shape()
 
@@ -158,11 +158,11 @@ def create_flatten_layer(layer):
     return layer
 
 # Funcion para inicializar las capas de clasificacion
-def create_fc_layer(input,          
-             num_inputs,    
+def create_fc_layer(input,
+             num_inputs,
              num_outputs,
              use_relu=True):
-    
+
     weights = create_weights(shape=[num_inputs, num_outputs])
     biases = create_biases(num_outputs)
 
@@ -200,7 +200,7 @@ layer_fc1 = create_fc_layer(input=layer_flat,
 layer_fc2 = create_fc_layer(input=layer_fc1,
                      num_inputs=fc_layer_size,
                      num_outputs=num_classes,
-                     use_relu=False) 
+                     use_relu=False)
 
 # Funcion de costo
 y_pred = tf.nn.softmax(layer_fc2,name='y_pred')
@@ -210,12 +210,18 @@ cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=layer_fc2,
                                                     labels=y_true)
 
 # Optimizacion Adam (No usa optimizacion por gradiente desendiente)
+tf.device('/cpu:0')
 cost = tf.reduce_mean(cross_entropy)
-optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cost)
 correct_prediction = tf.equal(y_pred_cls, y_true_cls)
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-session.run(tf.global_variables_initializer()) 
+session.run(tf.global_variables_initializer())
+
+# Multi-gpu implementation
+#optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cost)
+optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
+gpu_devices = 2
+tower_grads = []
 
 # Funcion que nos permite mostrar el progreso del entrenamiento
 def show_progress(epoch, iteration, feed_dict_train, feed_dict_validate, val_loss):
@@ -230,23 +236,68 @@ print ""
 print ""
 print "[i] Iniciando entrenamiento"
 
+def average_gradients(tower_grads):
+  """Calculate the average gradient for each shared variable across all towers.
+  Note that this function provides a synchronization point across all towers.
+  Args:
+    tower_grads: List of lists of (gradient, variable) tuples. The outer list
+      is over individual gradients. The inner list is over the gradient
+      calculation for each tower.
+  Returns:
+     List of pairs of (gradient, variable) where the gradient has been averaged
+     across all towers.
+  """
+  average_grads = []
+  for grad_and_vars in zip(*tower_grads):
+    # Note that each grad_and_vars looks like the following:
+    #   ((grad0_gpu0, var0_gpu0), ... , (grad0_gpuN, var0_gpuN))
+    grads = []
+    for g, _ in grad_and_vars:
+      # Add 0 dimension to the gradients to represent the tower.
+      expanded_g = tf.expand_dims(g, 0)
+
+      # Append on a 'tower' dimension which we will average over below.
+      grads.append(expanded_g)
+
+    # Average over the 'tower' dimension.
+    grad = tf.concat(axis=0, values=grads)
+    grad = tf.reduce_mean(grad, 0)
+
+    # Keep in mind that the Variables are redundant because they are shared
+    # across towers. So .. we will just return the first tower's pointer to
+    # the Variable.
+    v = grad_and_vars[0][1]
+    grad_and_var = (grad, v)
+    average_grads.append(grad_and_var)
+  return average_grads
+
 # El entrenamiento va a ejecutarse indefinidamente hasta que el modelo
 # alcance la precision deseada
 def train(accuracy_target):
-    
+
     i = 0
 
     while True:
+        for i in range(gpu_devices):
+            with tf.device('/device:GPU:%d' % (i)):
+                with tf.name_scope('%s_%d' % ("gpu", i)) as scope:
+                    x_batch, y_true_batch, _, cls_batch = data.train.next_batch(batch_size)
+                    x_valid_batch, y_valid_batch, _, valid_cls_batch = data.valid.next_batch(batch_size)
 
-        x_batch, y_true_batch, _, cls_batch = data.train.next_batch(batch_size)
-        x_valid_batch, y_valid_batch, _, valid_cls_batch = data.valid.next_batch(batch_size)
+                    feed_dict_tr = {x: x_batch, y_true: y_true_batch}
+                    feed_dict_val = {x: x_valid_batch, y_true: y_valid_batch}
 
-        feed_dict_tr = {x: x_batch,
-                           y_true: y_true_batch}
-        feed_dict_val = {x: x_valid_batch,
-                              y_true: y_valid_batch}
+                    net, out = session.run(y_pred, feed_dict=feed_dict_tr)
 
-        session.run(optimizer, feed_dict=feed_dict_tr)
+                    grads = optimizer.compute_gradients(cost)
+                    tower_grads.append(grads)
+
+                    tf.get_variable_scope().reuse_variables()
+
+        tf.get_variable_scope().reuse_variables()
+        grads = average_grads(tower_grads)
+
+        optimizer.apply_gradients(grads)
 
         val_acc = session.run(accuracy, feed_dict=feed_dict_val) * 100
         val_loss = session.run(cost, feed_dict=feed_dict_val)
@@ -257,7 +308,7 @@ def train(accuracy_target):
 	# guarda el modelo y se detiene el entrenamiento cuando alcanza
 	# la precision deseada
         if int(val_acc) >= int(accuracy_target):
-        	saver.save(session, '%s/%s-model' %(FLAGS.model, FLAGS.model)) 
+        	saver.save(session, '%s/%s-model' %(FLAGS.model, FLAGS.model))
         	break
 
 	# Tambien guarda el modelo y muestra el progreso en cada epoca
